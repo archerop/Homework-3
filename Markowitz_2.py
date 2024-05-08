@@ -74,7 +74,37 @@ class MyPortfolio:
         """
         TODO: Complete Task 4 Below
         """
+        self.lookback=12
+        self.gamma=3
+        for current_date in self.price.index[self.lookback:]:
+            window = self.returns.loc[current_date - pd.Timedelta(days=self.lookback):current_date]
+            mean_returns = window[assets].mean()
+            cov_matrix = window[assets].cov()
 
+            try:
+                with gp.Env(empty=True) as env:
+                    env.setParam("OutputFlag", 0)
+                    env.start()
+                    model = gp.Model(env=env)
+
+                weights = model.addVars(assets, name="weights")
+
+                portfolio_variance = gp.quicksum(
+                    cov_matrix.iloc[i, j] * weights[assets[i]] * weights[assets[j]]
+                    for i in range(len(assets)) for j in range(len(assets))
+                )
+
+                model.setObjective(portfolio_variance, gp.GRB.MINIMIZE)
+
+                model.addConstr(gp.quicksum(weights[asset] for asset in assets) == 1)
+
+                model.optimize()
+
+                for asset in assets:
+                    self.portfolio_weights.loc[current_date, asset] = weights[asset].X
+
+            except Exception as e:
+                print(f"Optimization error on {current_date}: {e}")
         """
         TODO: Complete Task 4 Above
         """
